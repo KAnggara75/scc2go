@@ -17,12 +17,9 @@ import (
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"os"
 	"resty.dev/v3"
 	"time"
 )
-
-var ErrorLoadConfig error
 
 type springCloudConfig struct {
 	Name            string           `json:"name"`
@@ -38,20 +35,21 @@ type propertySource struct {
 	Source map[string]interface{} `json:"source"`
 }
 
-func GetEnv(auth string) {
-	sccUrl := os.Getenv("SCC_URL")
+func GetEnv(sccUrl, auth string) {
 
 	if sccUrl != "" {
 		logrus.Info("Using SCC URL: ", sccUrl)
 		resBody, err := getSCC(sccUrl, auth)
 		if err != nil {
-			logrus.Errorf("Spring Cloud Config: %s\n", err)
+			logrus.Errorf("Error when get scc: %s\n", err)
+			return
 		}
 
 		scc := new(springCloudConfig)
 		err = json.Unmarshal(resBody, scc)
 		if err != nil {
 			logrus.Errorf("Spring Cloud Config: %s\n", err)
+			return
 		}
 
 		for i := len(scc.PropertySources) - 1; i >= 0; i-- {
@@ -59,9 +57,9 @@ func GetEnv(auth string) {
 				setIfNotExists(key, value)
 			}
 		}
-
 	} else {
-		logrus.Warn("cloud config URL is not defined, please set cloud config url in env variable: SCC_URL")
+		logrus.Error("cloud config URL is not defined")
+		return
 	}
 }
 
@@ -89,8 +87,11 @@ func getSCC(url, authHeader string) ([]byte, error) {
 		SetHeader("Authorization", authHeader).
 		Get(url)
 	if err != nil {
-		logrus.Error(err)
 		return nil, fmt.Errorf("fail get config from %s with error: %s", url, err)
+	}
+
+	if res.IsError() {
+		return nil, fmt.Errorf("fail get config from %s with error: %s", url, res.Status())
 	}
 
 	return res.Bytes(), nil

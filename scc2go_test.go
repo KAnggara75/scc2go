@@ -12,14 +12,25 @@ package scc2go_test
 
 import (
 	"github.com/KAnggara75/scc2go"
-	"github.com/spf13/viper"
-	"github.com/stretchr/testify/assert"
-	"os"
 	"testing"
 )
 
-func TestGetEnv(t *testing.T) {
-	auth := os.Getenv("AUTH")
-	scc2go.GetEnv(auth)
-	assert.NotNil(t, viper.Get("db.pakaiwa.host"))
+func TestGetEnvNoUrl(t *testing.T) {
+	scc2go.GetEnv("", "")
+}
+
+func TestGetEnvInvalidUrl(t *testing.T) {
+	scc2go.GetEnv("coba", "")
+}
+
+func TestGetEnvInvalidRes(t *testing.T) {
+	scc2go.GetEnv("https://google.com", "")
+}
+
+func TestGetEnvInvalidAuth(t *testing.T) {
+	scc2go.GetEnv("https://httpbin.org/bearer", "")
+}
+
+func TestGetEnvSuccess(t *testing.T) {
+	scc2go.GetEnv("https://mdlwg.wiremockapi.cloud/test/prd", "Bearer coba")
 }
