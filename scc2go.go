@@ -36,11 +36,11 @@ type propertySource struct {
 	Source map[string]interface{} `json:"source"`
 }
 
-func GetEnv(sccUrl, auth string) {
+func GetEnv(sccUrl, auth string, disableTls bool) {
 
 	if sccUrl != "" {
 		logrus.Info("Using SCC URL: ", sccUrl)
-		resBody, err := getSCC(sccUrl, auth)
+		resBody, err := getSCC(sccUrl, auth, disableTls)
 		if err != nil {
 			logrus.Errorf("Error when get scc: %s\n", err)
 			return
@@ -72,12 +72,12 @@ func setIfNotExists(k string, v interface{}) {
 	return
 }
 
-func getSCC(url, authHeader string) ([]byte, error) {
+func getSCC(url, authHeader string, disableTls bool) ([]byte, error) {
 	client := resty.New().
 		SetTimeout(5 * time.Second).
 		SetRetryCount(3).
 		SetRetryWaitTime(time.Second).
-		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
+		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: disableTls})
 	defer func(client *resty.Client) {
 		err := client.Close()
 		if err != nil {
