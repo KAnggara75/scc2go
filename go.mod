@@ -5,7 +5,7 @@ go 1.24.2
 require (
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/viper v1.20.1
-	resty.dev/v3 v3.0.0-beta.2
+	resty.dev/v3 v3.0.0-beta.3
 )
 
 require (
