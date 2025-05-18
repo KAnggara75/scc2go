@@ -13,6 +13,7 @@
 package scc2go
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/sirupsen/logrus"
@@ -75,7 +76,8 @@ func getSCC(url, authHeader string) ([]byte, error) {
 	client := resty.New().
 		SetTimeout(5 * time.Second).
 		SetRetryCount(3).
-		SetRetryWaitTime(time.Second)
+		SetRetryWaitTime(time.Second).
+		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true})
 	defer func(client *resty.Client) {
 		err := client.Close()
 		if err != nil {
