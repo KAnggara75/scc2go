@@ -36,7 +36,11 @@ type propertySource struct {
 	Source map[string]interface{} `json:"source"`
 }
 
-func GetEnv(sccUrl, auth string, disableTls bool) {
+func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
+	disableTls := false
+	if len(disableTlsOpt) > 0 {
+		disableTls = disableTlsOpt[0]
+	}
 
 	if sccUrl != "" {
 		logrus.Info("Using SCC URL: ", sccUrl)
