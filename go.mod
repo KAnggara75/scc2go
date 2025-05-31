@@ -3,7 +3,7 @@ module github.com/KAnggara75/scc2go
 go 1.24.2
 
 require (
-	github.com/sirupsen/logrus v1.9.3
+	github.com/rs/zerolog v1.34.0
 	github.com/spf13/viper v1.20.1
 	resty.dev/v3 v3.0.0-beta.3
 )
@@ -11,6 +11,8 @@ require (
 require (
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
 	github.com/sagikazarmark/locafero v0.7.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect

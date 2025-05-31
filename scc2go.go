@@ -16,7 +16,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	"resty.dev/v3"
 	"time"
@@ -37,23 +38,24 @@ type propertySource struct {
 }
 
 func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
 	disableTls := false
 	if len(disableTlsOpt) > 0 {
 		disableTls = disableTlsOpt[0]
 	}
 
 	if sccUrl != "" {
-		logrus.Info("Using SCC URL: ", sccUrl)
+		log.Info().Msgf("Using SCC URL: %s", sccUrl)
 		resBody, err := getSCC(sccUrl, auth, disableTls)
 		if err != nil {
-			logrus.Errorf("Error when get scc: %s\n", err)
+			log.Error().Msgf("Error when get scc: %v", err)
 			return
 		}
 
 		scc := new(springCloudConfig)
 		err = json.Unmarshal(resBody, scc)
 		if err != nil {
-			logrus.Errorf("Spring Cloud Config: %s\n", err)
+			log.Error().Msgf("Spring Cloud Config: %v", err)
 			return
 		}
 
@@ -63,7 +65,7 @@ func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
 			}
 		}
 	} else {
-		logrus.Error("cloud config URL is not defined")
+		log.Error().Msg("Cloud Config URL is not defined")
 		return
 	}
 }
