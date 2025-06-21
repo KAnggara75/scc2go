@@ -95,7 +95,7 @@ func getSCC(url, authHeader string, disableTls bool) ([]byte, error) {
 		SetHeader("Authorization", authHeader).
 		Get(url)
 	if err != nil {
-		return nil, fmt.Errorf("fail get config from %s with error: %s", url, err)
+		return nil, fmt.Errorf("fail get config from %s with error: %v", url, err)
 	}
 
 	if res.IsError() {
