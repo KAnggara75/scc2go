@@ -61,6 +61,7 @@ func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
 
 		for i := len(scc.PropertySources) - 1; i >= 0; i-- {
 			for key, value := range scc.PropertySources[i].Source {
+				log.Debug().Msgf("Retrive %s", key)
 				setIfNotExists(key, value)
 			}
 		}
