@@ -24,7 +24,7 @@
         <entry key="file://$PROJECT_DIR$/scc2go.go">
           <value>
             <ScannedPath>
-              <option name="lastModified" value="1756562321765" />
+              <option name="lastModified" value="1757056634945" />
               <option name="schema">
                 <list>
                   <option value="springCloudConfig" />
@@ -37,7 +37,7 @@
         <entry key="file://$PROJECT_DIR$/scc2go_test.go">
           <value>
             <ScannedPath>
-              <option name="lastModified" value="1745715500748" />
+              <option name="lastModified" value="1757057226666" />
             </ScannedPath>
           </value>
         </entry>
@@ -49,6 +49,6 @@
         <entry key="spring_cloud_config" value="springCloudConfig" />
       </map>
     </option>
-    <option name="lastTimeChecked" value="1756562134346" />
+    <option name="lastTimeChecked" value="1757056316847" />
   </component>
 </project>
