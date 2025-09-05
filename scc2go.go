@@ -26,9 +26,9 @@ import (
 type springCloudConfig struct {
 	Name            string           `json:"name"`
 	Profiles        []string         `json:"profiles"`
-	Label           interface{}      `json:"label"`
+	Label           string           `json:"label"`
 	Version         string           `json:"version"`
-	State           interface{}      `json:"state"`
+	State           string           `json:"state"`
 	PropertySources []propertySource `json:"propertySources"`
 }
 
@@ -72,11 +72,10 @@ func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
 }
 
 func setIfNotExists(k string, v interface{}) {
-	if viper.Get(k) != nil {
+	if viper.IsSet(k) {
 		return
 	}
 	viper.Set(k, v)
-	return
 }
 
 func getSCC(url, authHeader string, disableTls bool) ([]byte, error) {
