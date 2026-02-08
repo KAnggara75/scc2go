@@ -3,15 +3,15 @@ name: Go CI/CD with Semantic Versioning
 on:
   push:
     branches: [main, master]
-    paths:
-      - "**/*.go"
-      - "go.mod"
-      - "go.sum"
-  pull_request:
-    paths:
-      - "**/*.go"
-      - "go.mod"
-      - "go.sum"
+  #   paths:
+  #     - "**/*.go"
+  #     - "go.mod"
+  #     - "go.sum"
+  # pull_request:
+  #   paths:
+  #     - "**/*.go"
+  #     - "go.mod"
+  #     - "go.sum"
 
 env:
   GOTOOLCHAIN: local
@@ -73,14 +73,14 @@ jobs:
       - name: Setup SSH signing key (with passphrase)
         shell: bash
         env:
-          SSH_KEY_B64: ${{ secrets.RELEASE_BOT_SSH_KEY_B64 }}
-          SSH_PASSPHRASE: ${{ secrets.RELEASE_BOT_SSH_PASSPHRASE }}
+          RELEASE_BOT_SSH_KEY: ${{ secrets.RELEASE_BOT_SSH_KEY }}
+          RELEASE_BOT_SSH_PASSPHRASE: ${{ secrets.RELEASE_BOT_SSH_PASSPHRASE }}
         run: |
           set -euo pipefail
 
           # Setup SSH directory and key
           mkdir -p ~/.ssh
-          echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/id_ed25519
+          echo "$RELEASE_BOT_SSH_KEY" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
@@ -89,11 +89,11 @@ jobs:
           eval "$(ssh-agent -s)"
 
           # Add SSH key with passphrase using expect or sshpass alternative
-          if [ -n "$SSH_PASSPHRASE" ]; then
+          if [ -n "$RELEASE_BOT_SSH_PASSPHRASE" ]; then
             # Use SSH_ASKPASS for non-interactive passphrase
             cat > /tmp/ssh-askpass.sh << 'ASKPASS_EOF'
           #!/bin/bash
-          echo "$SSH_PASSPHRASE"
+          echo "$RELEASE_BOT_SSH_PASSPHRASE"
           ASKPASS_EOF
             chmod +x /tmp/ssh-askpass.sh
 
