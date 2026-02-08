@@ -88,16 +88,22 @@ jobs:
           # Start SSH agent and add key with passphrase
           eval "$(ssh-agent -s)"
 
-          # Add SSH key with passphrase using expect or sshpass alternative
+          # Add SSH key with passphrase using SSH_ASKPASS for non-interactive input
           if [ -n "$RELEASE_BOT_SSH_PASSPHRASE" ]; then
-            # Use SSH_ASKPASS for non-interactive passphrase
-            cat > /tmp/ssh-askpass.sh << 'ASKPASS_EOF'
-          #!/bin/bash
-          echo "$RELEASE_BOT_SSH_PASSPHRASE"
-          ASKPASS_EOF
+            # Create SSH_ASKPASS script with the passphrase embedded
+            cat > /tmp/ssh-askpass.sh <<ASKPASS_EOF
+
+            #!/bin/bash
+            echo "$RELEASE_BOT_SSH_PASSPHRASE"
+            ASKPASS_EOF
             chmod +x /tmp/ssh-askpass.sh
 
+            # Add key using SSH_ASKPASS
             SSH_ASKPASS=/tmp/ssh-askpass.sh DISPLAY=:0 ssh-add ~/.ssh/id_ed25519 < /dev/null
+
+            # Export SSH_ASKPASS for git signing operations
+            echo "SSH_ASKPASS=/tmp/ssh-askpass.sh" >> $GITHUB_ENV
+            echo "DISPLAY=:0" >> $GITHUB_ENV
           else
             ssh-add ~/.ssh/id_ed25519
           fi
