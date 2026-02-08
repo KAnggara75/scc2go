@@ -23,7 +23,6 @@ import (
 func TestGetEnvNoUrl(t *testing.T) {
 	// Test with empty URL - should log error and return early
 	scc2go.GetEnv("", "")
-	scc2go.GetEnv("", "")
 }
 
 func TestGetEnvInvalidUrl(t *testing.T) {

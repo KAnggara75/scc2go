@@ -10,9 +10,9 @@ The workflow uses SSH key signing to create verified tags on GitHub. This provid
 
 You need to configure the following secrets in your GitHub repository settings:
 
-### 1. `RELEASE_BOT_SSH_KEY_B64`
+### 1. `RELEASE_BOT_SSH_KEY`
 
-This is your SSH private key, base64-encoded.
+This is your SSH private key in plain text.
 
 **To create:**
 
@@ -22,11 +22,13 @@ ssh-keygen -t ed25519 -C "release@pakaiwa.dev" -f ~/.ssh/pakaiwa_release_bot
 
 # Enter a strong passphrase when prompted
 
-# Base64 encode the private key
-cat ~/.ssh/pakaiwa_release_bot | base64 | tr -d '\n'
+# Display the private key
+cat ~/.ssh/pakaiwa_release_bot
 ```
 
-Copy the output and add it as a repository secret named `RELEASE_BOT_SSH_KEY_B64`.
+Copy the **entire output** (including `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----`) and add it as a repository secret named `RELEASE_BOT_SSH_KEY`.
+
+**Important**: Copy the key exactly as shown, preserving all line breaks.
 
 ### 2. `RELEASE_BOT_SSH_PASSPHRASE`
 
@@ -71,7 +73,7 @@ For better security, create a dedicated bot account:
 
 1. **Checkout**: Fetches the repository with full history
 2. **Setup SSH Signing Key**:
-   - Decodes the base64-encoded SSH private key
+   - Writes the SSH private key to file
    - Sets up SSH agent with the passphrase
    - Configures git to use SSH signing
    - Creates the public key for verification
@@ -143,8 +145,9 @@ git show v1.0.0 --show-signature
 
 **Solution**:
 - Verify the SSH public key is added to GitHub as a **Signing Key**
-- Check that `RELEASE_BOT_SSH_KEY_B64` secret is correctly set
+- Check that `RELEASE_BOT_SSH_KEY` secret is correctly set (plain text, not base64)
 - Ensure the private key matches the public key on GitHub
+- Verify the key includes the header and footer lines
 
 ### "gpg: signing failed: Inappropriate ioctl for device"
 

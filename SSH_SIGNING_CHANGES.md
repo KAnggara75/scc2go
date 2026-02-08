@@ -26,7 +26,7 @@
 
 ### Before (Issues)
 ```yaml
-# SSH key directly in command (security risk)
+# SSH key with base64 encoding (unnecessary complexity)
 echo "${{ secrets.RELEASE_BOT_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
 
 # Passphrase with heredoc (doesn't work in non-interactive)
@@ -41,10 +41,13 @@ git config user.name "github-actions[bot]"  # Different from SSH setup
 
 ### After (Fixed)
 ```yaml
-# Secrets in environment variables
+# Plain SSH key (simpler and more direct)
 env:
-  SSH_KEY_B64: ${{ secrets.RELEASE_BOT_SSH_KEY_B64 }}
+  SSH_PRIVATE_KEY: ${{ secrets.RELEASE_BOT_SSH_KEY }}
   SSH_PASSPHRASE: ${{ secrets.RELEASE_BOT_SSH_PASSPHRASE }}
+
+# Write key directly
+echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
 
 # Non-interactive passphrase using SSH_ASKPASS
 SSH_ASKPASS=/tmp/ssh-askpass.sh DISPLAY=:0 ssh-add ~/.ssh/id_ed25519 < /dev/null
@@ -70,11 +73,11 @@ You can test the SSH signing locally:
 
 ```bash
 # Setup (one time)
-export SSH_KEY_B64="<your-base64-key>"
+export SSH_PRIVATE_KEY="$(cat ~/.ssh/pakaiwa_release_bot)"
 export SSH_PASSPHRASE="<your-passphrase>"
 
-# Decode key
-echo "$SSH_KEY_B64" | base64 -d > /tmp/test_key
+# Write key to temp file
+echo "$SSH_PRIVATE_KEY" > /tmp/test_key
 chmod 600 /tmp/test_key
 
 # Generate public key
@@ -143,7 +146,7 @@ rm /tmp/test_key /tmp/test_key.pub
 If the workflow fails, check:
 
 1. **Secrets are set correctly**:
-   - `RELEASE_BOT_SSH_KEY_B64`
+   - `RELEASE_BOT_SSH_KEY` (plain text with header/footer)
    - `RELEASE_BOT_SSH_PASSPHRASE`
    - `CODECOV_TOKEN`
 
