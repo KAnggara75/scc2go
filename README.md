@@ -2,7 +2,7 @@
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/KAnggara75/scc2go.svg)](https://pkg.go.dev/github.com/KAnggara75/scc2go)
 [![Go CI/CD](https://github.com/KAnggara75/scc2go/actions/workflows/go.yml/badge.svg)](https://github.com/KAnggara75/scc2go/actions/workflows/go.yml)
-[![codecov](https://codecov.io/gh/KAnggara75/scc2go/branch/main/graph/badge.svg)](https://codecov.io/gh/KAnggara75/scc2go)
+[![codecov](https://codecov.io/gh/KAnggara75/scc2go/branch/main/graph/badge.svg?token=6KSAE8FQH9)](https://codecov.io/gh/KAnggara75/scc2go)
 [![Go Report Card](https://goreportcard.com/badge/github.com/KAnggara75/scc2go)](https://goreportcard.com/report/github.com/KAnggara75/scc2go)
 [![Latest Release](https://img.shields.io/github/v/release/KAnggara75/scc2go)](https://github.com/KAnggara75/scc2go/releases)
 
