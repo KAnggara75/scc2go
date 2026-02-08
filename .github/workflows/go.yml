@@ -91,11 +91,7 @@ jobs:
           # Add SSH key with passphrase using SSH_ASKPASS for non-interactive input
           if [ -n "$RELEASE_BOT_SSH_PASSPHRASE" ]; then
             # Create SSH_ASKPASS script with the passphrase embedded
-            cat > /tmp/ssh-askpass.sh <<ASKPASS_EOF
-
-            #!/bin/bash
-            echo "$RELEASE_BOT_SSH_PASSPHRASE"
-            ASKPASS_EOF
+            printf '#!/bin/bash\necho "%s"\n' "$RELEASE_BOT_SSH_PASSPHRASE" > /tmp/ssh-askpass.sh
             chmod +x /tmp/ssh-askpass.sh
 
             # Add key using SSH_ASKPASS
