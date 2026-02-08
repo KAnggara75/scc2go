@@ -16,11 +16,12 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 	"resty.dev/v3"
-	"time"
 )
 
 type springCloudConfig struct {
@@ -33,8 +34,8 @@ type springCloudConfig struct {
 }
 
 type propertySource struct {
-	Name   string                 `json:"name"`
-	Source map[string]interface{} `json:"source"`
+	Name   string         `json:"name"`
+	Source map[string]any `json:"source"`
 }
 
 func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
@@ -71,7 +72,7 @@ func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
 	}
 }
 
-func setIfNotExists(k string, v interface{}) {
+func setIfNotExists(k string, v any) {
 	if viper.IsSet(k) {
 		return
 	}
