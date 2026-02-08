@@ -80,39 +80,34 @@ jobs:
 
           # Setup SSH directory and key
           mkdir -p ~/.ssh
-          echo "$RELEASE_BOT_SSH_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
+          echo "$RELEASE_BOT_SSH_KEY" > ~/.ssh/id_ed25519_encrypted
+          chmod 600 ~/.ssh/id_ed25519_encrypted
           ssh-keyscan github.com >> ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
-          # Start SSH agent and add key with passphrase
-          eval "$(ssh-agent -s)"
-
-          # Add SSH key with passphrase using SSH_ASKPASS for non-interactive input
+          # Remove passphrase from key for this workflow (Git SSH signing doesn't work well with passphrases)
           if [ -n "$RELEASE_BOT_SSH_PASSPHRASE" ]; then
-            # Create SSH_ASKPASS script with the passphrase embedded
-            printf '#!/bin/bash\necho "%s"\n' "$RELEASE_BOT_SSH_PASSPHRASE" > /tmp/ssh-askpass.sh
-            chmod +x /tmp/ssh-askpass.sh
-
-            # Add key using SSH_ASKPASS
-            SSH_ASKPASS=/tmp/ssh-askpass.sh DISPLAY=:0 ssh-add ~/.ssh/id_ed25519 < /dev/null
-
-            # Export SSH_ASKPASS for git signing operations
-            echo "SSH_ASKPASS=/tmp/ssh-askpass.sh" >> $GITHUB_ENV
-            echo "DISPLAY=:0" >> $GITHUB_ENV
-          else
-            ssh-add ~/.ssh/id_ed25519
+            # Use ssh-keygen to remove the passphrase
+            ssh-keygen -p -P "$RELEASE_BOT_SSH_PASSPHRASE" -N "" -f ~/.ssh/id_ed25519_encrypted
           fi
+
+          # Move to final location
+          mv ~/.ssh/id_ed25519_encrypted ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+
+          # Start SSH agent and add key (now without passphrase)
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_ed25519
 
           # Configure git for SSH signing
           git config --global user.name "pakaiwa-release-bot"
           git config --global user.email "release@pakaiwa.dev"
           git config --global gpg.format ssh
-          git config --global user.signingkey ~/.ssh/id_ed25519.pub
-          git config --global tag.gpgsign true
 
           # Create public key for signing
           ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub
+          git config --global user.signingkey ~/.ssh/id_ed25519.pub
+          git config --global tag.gpgsign true
 
           # Configure git to use SSH instead of HTTPS
           git config --global url."git@github.com:".insteadOf "https://github.com/"
