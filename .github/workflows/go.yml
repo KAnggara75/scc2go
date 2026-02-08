@@ -72,22 +72,52 @@ jobs:
 
       - name: Setup SSH signing key (with passphrase)
         shell: bash
+        env:
+          SSH_KEY_B64: ${{ secrets.RELEASE_BOT_SSH_KEY_B64 }}
+          SSH_PASSPHRASE: ${{ secrets.RELEASE_BOT_SSH_PASSPHRASE }}
         run: |
           set -euo pipefail
 
+          # Setup SSH directory and key
           mkdir -p ~/.ssh
-          echo "${{ secrets.RELEASE_BOT_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
+          echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
 
+          # Start SSH agent and add key with passphrase
           eval "$(ssh-agent -s)"
-          ssh-add ~/.ssh/id_ed25519 <<< "${{ secrets.RELEASE_BOT_SSH_PASSPHRASE }}"
 
+          # Add SSH key with passphrase using expect or sshpass alternative
+          if [ -n "$SSH_PASSPHRASE" ]; then
+            # Use SSH_ASKPASS for non-interactive passphrase
+            cat > /tmp/ssh-askpass.sh << 'ASKPASS_EOF'
+          #!/bin/bash
+          echo "$SSH_PASSPHRASE"
+          ASKPASS_EOF
+            chmod +x /tmp/ssh-askpass.sh
+
+            SSH_ASKPASS=/tmp/ssh-askpass.sh DISPLAY=:0 ssh-add ~/.ssh/id_ed25519 < /dev/null
+          else
+            ssh-add ~/.ssh/id_ed25519
+          fi
+
+          # Configure git for SSH signing
           git config --global user.name "pakaiwa-release-bot"
           git config --global user.email "release@pakaiwa.dev"
           git config --global gpg.format ssh
-          git config --global user.signingkey ~/.ssh/id_ed25519
+          git config --global user.signingkey ~/.ssh/id_ed25519.pub
           git config --global tag.gpgsign true
+
+          # Create public key for signing
+          ssh-keygen -y -f ~/.ssh/id_ed25519 > ~/.ssh/id_ed25519.pub
+
+          # Configure git to use SSH instead of HTTPS
+          git config --global url."git@github.com:".insteadOf "https://github.com/"
+
+          # Export SSH_AUTH_SOCK for subsequent steps
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> $GITHUB_ENV
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> $GITHUB_ENV
 
       - name: Get Latest Tag
         id: get_latest_tag
@@ -185,13 +215,20 @@ jobs:
           new_version="${{ steps.version_bump.outputs.new_version }}"
           changelog="${{ steps.changelog.outputs.changelog }}"
 
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          # Use the same credentials as SSH setup
+          git config user.name "pakaiwa-release-bot"
+          git config user.email "release@pakaiwa.my.id"
 
+          # Ensure we're using SSH remote
+          git remote set-url origin git@github.com:KAnggara75/scc2go.git
+
+          # Create signed tag
           git tag -s "$new_version" -m "$changelog"
+
+          # Push tag using SSH
           git push origin "$new_version"
 
-          echo "✅ Created and pushed tag: $new_version"
+          echo "✅ Created and pushed signed tag: $new_version"
 
       - name: Create GitHub Release
         if: steps.check_tag.outputs.exists == 'false' && steps.version_bump.outputs.bump_type != 'none'
