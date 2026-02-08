@@ -1,6 +1,11 @@
 # SCC to Go Viper
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/KAnggara75/scc2go.svg)](https://pkg.go.dev/github.com/KAnggara75/scc2go)
+[![Go CI/CD](https://github.com/KAnggara75/scc2go/actions/workflows/go.yml/badge.svg)](https://github.com/KAnggara75/scc2go/actions/workflows/go.yml)
+[![codecov](https://codecov.io/gh/KAnggara75/scc2go/branch/main/graph/badge.svg)](https://codecov.io/gh/KAnggara75/scc2go)
+[![Go Report Card](https://goreportcard.com/badge/github.com/KAnggara75/scc2go)](https://goreportcard.com/report/github.com/KAnggara75/scc2go)
+[![Latest Release](https://img.shields.io/github/v/release/KAnggara75/scc2go)](https://github.com/KAnggara75/scc2go/releases)
+
 ## License
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FKAnggara75%2Fscc2go.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FKAnggara75%2Fscc2go?ref=badge_large)
 
@@ -86,6 +91,42 @@ func main() {
 scc2go.GetEnv("SCC_URL", "AUTH")
 ```
 
+## 📦 Versioning
+
+This project follows [Semantic Versioning](https://semver.org/) with automated releases based on [Conventional Commits](https://www.conventionalcommits.org/).
+
+For detailed information about versioning and commit message format, see [VERSIONING.md](VERSIONING.md).
+
+### Quick Reference
+
+- `feat:` - New feature (minor version bump)
+- `fix:` - Bug fix (patch version bump)
+- `feat!:` or `BREAKING CHANGE:` - Breaking change (major version bump)
+
+## 🧪 Testing
+
+Run tests with coverage:
+
+```bash
+go test -v -race -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+Current test coverage: **97.1%**
+
 ## 🤝 Kontribusi
+
 Pull request & masukan sangat diterima!
-Silakan fork & buat PR jika ingin menambah fitur.
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feat/amazing-feature`)
+3. Commit your changes using [Conventional Commits](https://www.conventionalcommits.org/)
+   - `feat: add new feature`
+   - `fix: resolve bug`
+   - `docs: update documentation`
+4. Push to the branch (`git push origin feat/amazing-feature`)
+5. Open a Pull Request
+
+See [VERSIONING.md](VERSIONING.md) for commit message guidelines.
