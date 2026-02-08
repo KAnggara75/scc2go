@@ -25,11 +25,6 @@ func TestGetEnvNoUrl(t *testing.T) {
 	scc2go.GetEnv("", "")
 }
 
-func TestGetEnvNoUrl2(t *testing.T) {
-	// Test with empty URL - should log error and return early
-	scc2go.GetEnv("", "")
-}
-
 func TestGetEnvInvalidUrl(t *testing.T) {
 	// Test with invalid URL format
 	scc2go.GetEnv("coba", "")

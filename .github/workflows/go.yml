@@ -76,25 +76,18 @@ jobs:
           set -euo pipefail
 
           mkdir -p ~/.ssh
-          echo "${{ secrets.RELEASE_BOT_SSH_KEY }}" > ~/.ssh/id_ed25519
+          echo "${{ secrets.RELEASE_BOT_SSH_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-          # Start ssh-agent and add key using passphrase (non-interactive)
           eval "$(ssh-agent -s)"
-          SSH_ASKPASS_REQUIRE=force
-          export SSH_ASKPASS=/usr/bin/ssh-askpass
-          setsid -w ssh-add ~/.ssh/id_ed25519 <<< "${{ secrets.RELEASE_BOT_SSH_PASSPHRASE }}"
+          ssh-add ~/.ssh/id_ed25519 <<< "${{ secrets.RELEASE_BOT_SSH_PASSPHRASE }}"
 
-          # Git SSH signing configuration
           git config --global user.name "pakaiwa-release-bot"
           git config --global user.email "release@pakaiwa.dev"
           git config --global gpg.format ssh
           git config --global user.signingkey ~/.ssh/id_ed25519
           git config --global tag.gpgsign true
-
-          # Force git to use ssh-agent
-          export GIT_SSH_COMMAND="ssh -o IdentitiesOnly=yes"
 
       - name: Get Latest Tag
         id: get_latest_tag
