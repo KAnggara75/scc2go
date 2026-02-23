@@ -16,6 +16,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -45,30 +47,47 @@ func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
 		disableTls = disableTlsOpt[0]
 	}
 
-	if sccUrl != "" {
-		log.Info().Msgf("Using SCC URL: %s", sccUrl)
-		resBody, err := getSCC(sccUrl, auth, disableTls)
-		if err != nil {
-			log.Error().Msgf("Error when get scc: %v", err)
-			return
-		}
-
-		scc := new(springCloudConfig)
-		err = json.Unmarshal(resBody, scc)
-		if err != nil {
-			log.Error().Msgf("Spring Cloud Config: %v", err)
-			return
-		}
-
-		for i := len(scc.PropertySources) - 1; i >= 0; i-- {
-			for key, value := range scc.PropertySources[i].Source {
-				log.Debug().Msgf("Retrive %s", key)
-				setIfNotExists(key, value)
-			}
-		}
-	} else {
-		log.Error().Msg("Cloud Config URL is not defined")
+	if sccUrl == "" || sccUrl == "local" {
+		log.Info().Msg("SCC URL is local or empty, loading from environment variables")
+		loadFromEnv()
 		return
+	}
+
+	log.Info().Msgf("Using SCC URL: %s", sccUrl)
+	resBody, err := getSCC(sccUrl, auth, disableTls)
+	if err != nil {
+		log.Error().Msgf("Error when get scc: %v", err)
+		return
+	}
+
+	scc := new(springCloudConfig)
+	err = json.Unmarshal(resBody, scc)
+	if err != nil {
+		log.Error().Msgf("Spring Cloud Config: %v", err)
+		return
+	}
+
+	for i := len(scc.PropertySources) - 1; i >= 0; i-- {
+		for key, value := range scc.PropertySources[i].Source {
+			log.Debug().Msgf("Retrive %s", key)
+			setIfNotExists(key, value)
+		}
+	}
+}
+
+// loadFromEnv reads all OS environment variables and stores them in viper.
+// Each env var key is transformed: underscores (_) become dots (.)
+// and the key is lowercased so that EXAMPLE_VAR becomes example.var.
+func loadFromEnv() {
+	for _, env := range os.Environ() {
+		parts := strings.SplitN(env, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		rawKey, value := parts[0], parts[1]
+		viperKey := strings.ToLower(strings.ReplaceAll(rawKey, "_", "."))
+		log.Debug().Msgf("Loading env var %s as %s", rawKey, viperKey)
+		setIfNotExists(viperKey, value)
 	}
 }
 
