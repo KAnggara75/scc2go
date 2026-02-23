@@ -99,11 +99,16 @@ func setIfNotExists(k string, v any) {
 }
 
 func getSCC(url, authHeader string, disableTls bool) ([]byte, error) {
+	tlsConfig := &tls.Config{}
+	if disableTls {
+		tlsConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- caller explicitly opted in
+	}
+
 	client := resty.New().
 		SetTimeout(5 * time.Second).
 		SetRetryCount(3).
 		SetRetryWaitTime(time.Second).
-		SetTLSClientConfig(&tls.Config{InsecureSkipVerify: disableTls})
+		SetTLSClientConfig(tlsConfig)
 	defer func(client *resty.Client) {
 		err := client.Close()
 		if err != nil {

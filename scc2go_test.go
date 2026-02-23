@@ -17,8 +17,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/KAnggara75/scc2go"
 	"github.com/spf13/viper"
+
+	"github.com/KAnggara75/scc2go"
 )
 
 func TestGetEnvNoUrl(t *testing.T) {
