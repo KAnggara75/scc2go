@@ -14,15 +14,64 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
-	"github.com/KAnggara75/scc2go"
 	"github.com/spf13/viper"
+
+	"github.com/KAnggara75/scc2go"
 )
 
 func TestGetEnvNoUrl(t *testing.T) {
-	// Test with empty URL - should log error and return early
+	// Test with empty URL - should load from environment variables
+	viper.Reset()
+	os.Setenv("TEST_EMPTY_URL_VAR", "hello")
+	defer os.Unsetenv("TEST_EMPTY_URL_VAR")
 	scc2go.GetEnv("", "")
+	if viper.GetString("test.empty.url.var") != "hello" {
+		t.Errorf("Expected test.empty.url.var to be 'hello', got '%s'", viper.GetString("test.empty.url.var"))
+	}
+}
+
+func TestGetEnvLocalUrl(t *testing.T) {
+	// Test with "local" URL - should load from environment variables
+	viper.Reset()
+	os.Setenv("EXAMPLE_VAR", "example_value")
+	defer os.Unsetenv("EXAMPLE_VAR")
+	scc2go.GetEnv("local", "")
+	if viper.GetString("example.var") != "example_value" {
+		t.Errorf("Expected example.var to be 'example_value', got '%s'", viper.GetString("example.var"))
+	}
+}
+
+func TestGetEnvLocalKeyMapping(t *testing.T) {
+	// Test env var key transformation: EXAMPLE_VAR -> example.var
+	viper.Reset()
+	os.Setenv("MY_APP_PORT", "9090")
+	os.Setenv("MY_APP_NAME", "my-service")
+	defer func() {
+		os.Unsetenv("MY_APP_PORT")
+		os.Unsetenv("MY_APP_NAME")
+	}()
+	scc2go.GetEnv("local", "")
+	if viper.GetString("my.app.port") != "9090" {
+		t.Errorf("Expected my.app.port to be '9090', got '%s'", viper.GetString("my.app.port"))
+	}
+	if viper.GetString("my.app.name") != "my-service" {
+		t.Errorf("Expected my.app.name to be 'my-service', got '%s'", viper.GetString("my.app.name"))
+	}
+}
+
+func TestGetEnvLocalDoesNotOverrideExisting(t *testing.T) {
+	// Test that existing viper values are not overwritten by env vars in local mode
+	viper.Reset()
+	viper.Set("existing.key", "pre-set-value")
+	os.Setenv("EXISTING_KEY", "env-value")
+	defer os.Unsetenv("EXISTING_KEY")
+	scc2go.GetEnv("local", "")
+	if viper.GetString("existing.key") != "pre-set-value" {
+		t.Errorf("Expected existing.key to remain 'pre-set-value', got '%s'", viper.GetString("existing.key"))
+	}
 }
 
 func TestGetEnvInvalidUrl(t *testing.T) {
