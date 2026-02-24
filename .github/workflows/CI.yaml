@@ -113,6 +113,8 @@ jobs:
         uses: pre-commit/action@v3.0.1
 
   create-tag:
+    permissions:
+      contents: write
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     needs: [test, build]
