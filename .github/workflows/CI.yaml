@@ -61,6 +61,8 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
   build:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     needs: test
     strategy:
