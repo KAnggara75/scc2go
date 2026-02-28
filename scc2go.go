@@ -41,35 +41,60 @@ type propertySource struct {
 }
 
 func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
+	GetEnvWithDebug(sccUrl, auth, false, disableTlsOpt...)
+}
+
+func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+
+	level := zerolog.InfoLevel
+	if debug {
+		level = zerolog.TraceLevel
+	}
+
+	logger := zerolog.New(os.Stdout).
+		Level(level).
+		With().
+		Timestamp().
+		Str("component", "scc_loader").
+		Logger()
+
 	disableTls := false
 	if len(disableTlsOpt) > 0 {
 		disableTls = disableTlsOpt[0]
 	}
 
 	if sccUrl == "" || sccUrl == "local" {
-		log.Info().Msg("SCC URL is local or empty, loading from environment variables")
+		logger.Info().Msg("SCC URL is local or empty, loading from environment variables")
 		loadFromEnv()
 		return
 	}
 
-	log.Info().Msgf("Using SCC URL: %s", sccUrl)
+	logger.Info().
+		Str("scc_url", sccUrl).
+		Msg("using SCC URL")
+
 	resBody, err := getSCC(sccUrl, auth, disableTls)
 	if err != nil {
-		log.Error().Msgf("Error when get scc: %v", err)
+		logger.Error().
+			Err(err).
+			Msg("error when get scc")
 		return
 	}
 
-	scc := new(springCloudConfig)
-	err = json.Unmarshal(resBody, scc)
-	if err != nil {
-		log.Error().Msgf("Spring Cloud Config: %v", err)
+	var scc springCloudConfig
+	if err := json.Unmarshal(resBody, &scc); err != nil {
+		logger.Error().
+			Err(err).
+			Msg("spring cloud config unmarshal failed")
 		return
 	}
 
 	for i := len(scc.PropertySources) - 1; i >= 0; i-- {
 		for key, value := range scc.PropertySources[i].Source {
-			log.Trace().Msgf("Retrive %s", key)
+			logger.Trace().
+				Str("key", key).
+				Msg("retrieve property")
 			setIfNotExists(key, value)
 		}
 	}
