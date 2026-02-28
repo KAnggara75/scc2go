@@ -69,7 +69,7 @@ func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
 
 	for i := len(scc.PropertySources) - 1; i >= 0; i-- {
 		for key, value := range scc.PropertySources[i].Source {
-			log.Debug().Msgf("Retrive %s", key)
+			log.Trace().Msgf("Retrive %s", key)
 			setIfNotExists(key, value)
 		}
 	}
@@ -86,7 +86,7 @@ func loadFromEnv() {
 		}
 		rawKey, value := parts[0], parts[1]
 		viperKey := strings.ToLower(strings.ReplaceAll(rawKey, "_", "."))
-		log.Debug().Msgf("Loading env var %s as %s", rawKey, viperKey)
+		log.Trace().Msgf("Loading env var %s as %s", rawKey, viperKey)
 		setIfNotExists(viperKey, value)
 	}
 }
