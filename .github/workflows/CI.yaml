@@ -20,6 +20,8 @@ env:
 jobs:
   test:
     name: Test (Go ${{ matrix.go-version }})
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
 
     strategy:
