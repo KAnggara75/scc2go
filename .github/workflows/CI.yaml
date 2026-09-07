@@ -7,12 +7,19 @@ on:
       - "**/*.go"
       - "go.mod"
       - "go.sum"
+      - ".pre-commit-config.yaml"
       - ".github/workflows/CI.yaml"
   pull_request:
     paths:
       - "**/*.go"
       - "go.mod"
       - "go.sum"
+      - ".pre-commit-config.yaml"
+      - ".github/workflows/CI.yaml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   GOTOOLCHAIN: local
@@ -27,14 +34,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ["1.25.7", "1.26"]
+        go-version: ["1.25.x", "1.26.x"]
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6.2.0
+        uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
           cache: true
@@ -42,82 +49,106 @@ jobs:
       - name: Verify dependencies
         run: go mod verify
 
-      - name: Run tests (matrix)
+      - name: Run tests with race & coverage
         run: |
-          if [ "${{ matrix.go-version }}" = "1.25.7" ]; then
-            echo "Running race detector (latest Go only)..."
-            go test -v -race ./...
-
-            echo "Running coverage (separate from race)..."
-            go test -v -coverprofile=coverage.out -covermode=atomic ./...
+          if [ "${{ matrix.go-version }}" = "1.25.x" ]; then
+            echo "Running race and coverage on baseline Go..."
+            go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
           else
             echo "Running standard tests..."
             go test -v ./...
           fi
 
       - name: Upload results to Codecov
-        if: matrix.go-version == '1.25.7'
-        uses: codecov/codecov-action@v5
+        if: matrix.go-version == '1.25.x'
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
 
-  build:
+  lint-and-sec:
+    name: Lint & Security Audit
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    needs: test
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version: ["1.26.0", "1.25.7"]
-    name: Build ${{ matrix.go-version == '1.26.0' && '(latest)' || '1.25.7' }}
-
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@v7
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: "1.25.x"
+          cache: true
 
-      - name: Build
-        run: go build -v ./...
+      - name: Set up Python for pre-commit
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: "pip"
 
-      - name: Test
-        run: go test -v ./...
+      - name: Cache Go tools
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-go-tools-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-tools-
 
-      - name: Install goimports
+      - name: Install audit tools
         run: |
-          go install golang.org/x/tools/cmd/goimports@latest
-          export PATH="$HOME/go/bin:$PATH"
+          which goimports || go install golang.org/x/tools/cmd/goimports@latest
+          which govulncheck || go install golang.org/x/vuln/cmd/govulncheck@latest
+          which staticcheck || go install honnef.co/go/tools/cmd/staticcheck@latest
+          which gosec || go install github.com/securego/gosec/v2/cmd/gosec@latest
+          echo "$HOME/go/bin" >> $GITHUB_PATH
 
-      - name: install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Run govulncheck
+        run: govulncheck ./...
 
-      - name: install staticcheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+      - name: Run staticcheck
+        run: staticcheck ./...
 
-      - name: install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
-
-      - name: Download dependencies
-        run: go mod download
+      - name: Run gosec
+        run: gosec -exclude-dir=vendor ./...
 
       - name: Run pre-commit
         uses: pre-commit/action@v3.0.1
 
+  build:
+    name: Build (Go ${{ matrix.go-version }})
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    needs: [test, lint-and-sec]
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ["1.25.x", "1.26.x"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Build
+        run: go build -v ./...
+
   create-tag:
+    name: Create Tag & Release
     permissions:
       contents: write
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    needs: [test, build]
+    needs: [build]
     env:
       TZ: Asia/Jakarta
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
