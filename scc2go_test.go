@@ -467,3 +467,45 @@ func TestGetEnvAuthorizationHeader(t *testing.T) {
 		})
 	}
 }
+
+func TestGetEnvWithDebug(t *testing.T) {
+	t.Run("debug enabled with mock server", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			response := map[string]any{
+				"name":     "test-app",
+				"profiles": []string{"default"},
+				"label":    "main",
+				"version":  "1.0.0",
+				"state":    "active",
+				"propertySources": []map[string]any{
+					{
+						"name": "test-source",
+						"source": map[string]any{
+							"debug.key": "debug.val",
+						},
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+		}))
+		defer server.Close()
+
+		viper.Reset()
+		scc2go.GetEnvWithDebug(server.URL, "Bearer token", true)
+		if viper.GetString("debug.key") != "debug.val" {
+			t.Errorf("Expected debug.key to be 'debug.val', got '%s'", viper.GetString("debug.key"))
+		}
+	})
+
+	t.Run("debug enabled with local mode", func(t *testing.T) {
+		viper.Reset()
+		os.Setenv("TEST_DEBUG_LOCAL_VAR", "debug_local")
+		defer os.Unsetenv("TEST_DEBUG_LOCAL_VAR")
+
+		scc2go.GetEnvWithDebug("local", "", true)
+		if viper.GetString("test.debug.local.var") != "debug_local" {
+			t.Errorf("Expected test.debug.local.var to be 'debug_local', got '%s'", viper.GetString("test.debug.local.var"))
+		}
+	})
+}
