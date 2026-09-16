@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ["1.25.x", "1.26.x"]
+        go-version: ["1.26.x"]
 
     steps:
       - name: Checkout code
@@ -50,17 +50,9 @@ jobs:
         run: go mod verify
 
       - name: Run tests with race & coverage
-        run: |
-          if [ "${{ matrix.go-version }}" = "1.25.x" ]; then
-            echo "Running race and coverage on baseline Go..."
-            go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
-          else
-            echo "Running standard tests..."
-            go test -v ./...
-          fi
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
       - name: Upload results to Codecov
-        if: matrix.go-version == '1.25.x'
         uses: codecov/codecov-action@v7
         with:
           files: ./coverage.out
@@ -77,14 +69,13 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: "1.25.x"
+          go-version: "1.26.x"
           cache: true
 
       - name: Set up Python for pre-commit
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-          cache: "pip"
 
       - name: Cache Go tools
         uses: actions/cache@v6.1.0
@@ -123,7 +114,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: ["1.25.x", "1.26.x"]
+        go-version: ["1.26.x"]
 
     steps:
       - uses: actions/checkout@v7
@@ -152,7 +143,7 @@ jobs:
 
       - name: Bump version and push SemVer tag
         id: tag_version
-        uses: anothrNick/github-tag-action@v1
+        uses: anothrNick/github-tag-action@1.75.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG_PREFIX: "v"
