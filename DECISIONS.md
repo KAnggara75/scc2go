@@ -32,7 +32,7 @@
 
 ## ADR-003: Timestamp-Based Versioning Scheme
 
-- **Status**: Accepted
+- **Status**: Superseded by ADR-005
 - **Date**: 2026-09-07
 - **Source**: Developer interview & CI workflow evidence (`.github/workflows/CI.yaml`)
 - **Context**:
@@ -57,3 +57,19 @@
 - **Consequences**:
   - Positif: Memungkinkan aplikasi Go menangani konfigurasi rahasia (credentials, database passwords) yang terenkripsi di Spring Cloud Config.
   - Negatif/Trade-off: Menambah dependensi kriptografi atau logic request tambahan ke endpoint dekripsi SCC server.
+
+---
+
+## ADR-005: Automated Semantic Versioning (SemVer) with Conventional Commits
+
+- **Status**: Accepted
+- **Date**: 2026-09-16
+- **Source**: Developer request (`optimalkan CI.yaml buat versioning semver`) & CI workflow (`.github/workflows/CI.yaml`)
+- **Context**:
+  Sebelumnya proyek menggunakan skema penomoran berbasis timestamp WIB (`v0.YY.M-DHHMM`) via shell script di GitHub Actions (ADR-003). Skema ini menyulitkan package manager Go dan tool dependensi eksternal untuk mengidentifikasi level perubahan semantik (major/minor/patch/breaking change) secara deterministik.
+- **Decision**:
+  Menggantikan skema timestamp dengan Semantic Versioning standar (`vMAJOR.MINOR.PATCH`) yang sepenuhnya terotomatisasi menggunakan `anothrNick/github-tag-action@v1`. Logika kenaikan versi ditentukan langsung dari analisis Conventional Commits (`feat:` -> minor, `fix:` -> patch, `BREAKING CHANGE:` / `!` -> major).
+- **Consequences**:
+  - Positif: Sepenuhnya mematuhi spesifikasi SemVer 2.0.0 dan ekosistem Go modules (`go get`, `go proxy`), otomatisasi rilis tetap berjalan tanpa intervensi manual.
+  - Negatif/Trade-off: Memerlukan kepatuhan konsisten dari kontributor dalam menulis prefix Conventional Commits yang tepat pada setiap commit / pull request.
+
