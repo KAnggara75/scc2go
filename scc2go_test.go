@@ -509,3 +509,68 @@ func TestGetEnvWithDebug(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadWithCustomViper(t *testing.T) {
+	customViper := viper.New()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := map[string]any{
+			"name":     "test-app",
+			"profiles": []string{"default"},
+			"propertySources": []map[string]any{
+				{
+					"name": "test-source",
+					"source": map[string]any{
+						"custom.viper.key": "custom-val",
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	viper.Reset() // Ensure global viper is clean
+
+	err := scc2go.Load(server.URL, "Bearer token", scc2go.WithViper(customViper))
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if customViper.GetString("custom.viper.key") != "custom-val" {
+		t.Errorf("Expected customViper to have 'custom-val', got '%s'", customViper.GetString("custom.viper.key"))
+	}
+
+	if viper.IsSet("custom.viper.key") {
+		t.Errorf("Global viper should not be populated when WithViper is specified")
+	}
+}
+
+func TestLoadErrorPropagation(t *testing.T) {
+	t.Run("server returns 500 error", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Internal Error"))
+		}))
+		defer server.Close()
+
+		err := scc2go.Load(server.URL, "")
+		if err == nil {
+			t.Errorf("Expected error from Load on 500 status, got nil")
+		}
+	})
+
+	t.Run("server returns corrupt json", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte("{invalid-json"))
+		}))
+		defer server.Close()
+
+		err := scc2go.Load(server.URL, "")
+		if err == nil {
+			t.Errorf("Expected json unmarshal error from Load, got nil")
+		}
+	})
+}
