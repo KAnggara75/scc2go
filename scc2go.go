@@ -193,11 +193,6 @@ func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
 	)
 }
 
-// loadFromEnv reads all OS environment variables and stores them in the global viper.
-func loadFromEnv() {
-	loadFromEnvToTarget(globalViperTarget{})
-}
-
 func loadFromEnvToTarget(target ConfigTarget) {
 	for _, env := range os.Environ() {
 		parts := strings.SplitN(env, "=", 2)
@@ -211,19 +206,11 @@ func loadFromEnvToTarget(target ConfigTarget) {
 	}
 }
 
-func setIfNotExists(k string, v any) {
-	setIfNotExistsOnTarget(globalViperTarget{}, k, v)
-}
-
 func setIfNotExistsOnTarget(target ConfigTarget, k string, v any) {
 	if target.IsSet(k) {
 		return
 	}
 	target.Set(k, v)
-}
-
-func getSCC(url, authHeader string, disableTls bool) ([]byte, error) {
-	return getSCCWithContext(context.Background(), url, authHeader, disableTls, 5*time.Second)
 }
 
 func getSCCWithContext(ctx context.Context, url, authHeader string, disableTls bool, timeout time.Duration) ([]byte, error) {
