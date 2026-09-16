@@ -41,7 +41,7 @@
 ---
 
 ## 6. Runtime Environment & Constraints
-- **Language / Runtime**: Go 1.25.0+ / Go 1.26.0 (diuji pada Go 1.25.7 dan Go 1.26).
+- **Language / Runtime**: Go 1.26.0 (diuji pada Go 1.26.x di Ubuntu CI).
 - **OS Support**: Multiplatform (Linux, macOS, Windows).
 - **Network Constraints**: Memerlukan konektivitas HTTP/HTTPS ke Spring Cloud Config Server dengan timeout default 5 detik dan 3 kali percobaan ulang (retry).
 - **Security Scanners**: Wajib mematuhi audit `gosec`, `govulncheck`, dan `staticcheck` yang dieksekusi pada pre-push dan CI.
@@ -54,7 +54,7 @@
   - `zerolog-use-stringer` untuk konsistensi zerologging.
   - `staticcheck` dan `govulncheck` pada level pre-push git hook.
 - **Commit Style**: Mengikuti panduan [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, dsb.).
-- **Branching & Release**: Merge ke `main` secara otomatis memicu pembuatan git tag berbasis timestamp waktu WIB: `v0.YY.M-DHHMM`.
+- **Branching & Release**: Merge ke `main` secara otomatis memicu bump Semantic Versioning (`vMAJOR.MINOR.PATCH`) via `anothrNick/github-tag-action` dan pembuatan GitHub Release dengan catatan rilis yang diekstrak dari pesan commit via `softprops/action-gh-release`.
 
 ---
 
