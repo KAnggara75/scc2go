@@ -13,6 +13,7 @@
 package scc2go
 
 import (
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -40,15 +41,92 @@ type propertySource struct {
 	Source map[string]any `json:"source"`
 }
 
-func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
-	GetEnvWithDebug(sccUrl, auth, false, disableTlsOpt...)
+// ConfigTarget is an abstraction for setting key-values into Viper instances.
+type ConfigTarget interface {
+	IsSet(key string) bool
+	Set(key string, value any)
 }
 
-func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
-	zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
+type globalViperTarget struct{}
+
+func (globalViperTarget) IsSet(key string) bool {
+	return viper.IsSet(key)
+}
+
+func (globalViperTarget) Set(key string, value any) {
+	viper.Set(key, value)
+}
+
+// Option configures behavior of SCC loading.
+type Option func(*loaderConfig)
+
+type loaderConfig struct {
+	ctx        context.Context
+	target     ConfigTarget
+	debug      bool
+	disableTls bool
+	timeout    time.Duration
+}
+
+// WithContext supplies a context for cancellation and timeouts.
+func WithContext(ctx context.Context) Option {
+	return func(c *loaderConfig) {
+		if ctx != nil {
+			c.ctx = ctx
+		}
+	}
+}
+
+// WithViper specifies a custom *viper.Viper instance to populate instead of the global singleton.
+func WithViper(v *viper.Viper) Option {
+	return func(c *loaderConfig) {
+		if v != nil {
+			c.target = v
+		}
+	}
+}
+
+// WithDebug enables or disables trace-level logging.
+func WithDebug(debug bool) Option {
+	return func(c *loaderConfig) {
+		c.debug = debug
+	}
+}
+
+// WithDisableTLS skips TLS certificate verification.
+func WithDisableTLS(disable bool) Option {
+	return func(c *loaderConfig) {
+		c.disableTls = disable
+	}
+}
+
+// WithTimeout sets a custom HTTP request timeout.
+func WithTimeout(timeout time.Duration) Option {
+	return func(c *loaderConfig) {
+		if timeout > 0 {
+			c.timeout = timeout
+		}
+	}
+}
+
+// Load fetches configurations and stores them into the designated target, returning an error if retrieval or unmarshaling fails.
+func Load(sccUrl, auth string, opts ...Option) error {
+	cfg := &loaderConfig{
+		ctx:        context.Background(),
+		target:     globalViperTarget{},
+		debug:      false,
+		disableTls: false,
+		timeout:    5 * time.Second,
+	}
+
+	for _, opt := range opts {
+		if opt != nil {
+			opt(cfg)
+		}
+	}
 
 	level := zerolog.InfoLevel
-	if debug {
+	if cfg.debug {
 		level = zerolog.TraceLevel
 	}
 
@@ -59,27 +137,22 @@ func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
 		Str("component", "scc_loader").
 		Logger()
 
-	disableTls := false
-	if len(disableTlsOpt) > 0 {
-		disableTls = disableTlsOpt[0]
-	}
-
 	if sccUrl == "" || sccUrl == "local" {
 		logger.Info().Msg("SCC URL is local or empty, loading from environment variables")
-		loadFromEnv()
-		return
+		loadFromEnvToTarget(cfg.target)
+		return nil
 	}
 
 	logger.Info().
 		Str("scc_url", sccUrl).
 		Msg("using SCC URL")
 
-	resBody, err := getSCC(sccUrl, auth, disableTls)
+	resBody, err := getSCCWithContext(cfg.ctx, sccUrl, auth, cfg.disableTls, cfg.timeout)
 	if err != nil {
 		logger.Error().
 			Err(err).
 			Msg("error when get scc")
-		return
+		return err
 	}
 
 	var scc springCloudConfig
@@ -87,7 +160,7 @@ func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
 		logger.Error().
 			Err(err).
 			Msg("spring cloud config unmarshal failed")
-		return
+		return fmt.Errorf("spring cloud config unmarshal failed: %w", err)
 	}
 
 	for i := len(scc.PropertySources) - 1; i >= 0; i-- {
@@ -95,15 +168,32 @@ func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
 			logger.Trace().
 				Str("key", key).
 				Msg("retrieve property")
-			setIfNotExists(key, value)
+			setIfNotExistsOnTarget(cfg.target, key, value)
 		}
 	}
+
+	return nil
 }
 
-// loadFromEnv reads all OS environment variables and stores them in viper.
-// Each env var key is transformed: underscores (_) become dots (.)
-// and the key is lowercased so that EXAMPLE_VAR becomes example.var.
-func loadFromEnv() {
+// GetEnv preserves backward compatibility by populating the global viper singleton without returning an error.
+func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
+	GetEnvWithDebug(sccUrl, auth, false, disableTlsOpt...)
+}
+
+// GetEnvWithDebug preserves backward compatibility with debug logging flag.
+func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
+	disableTls := false
+	if len(disableTlsOpt) > 0 {
+		disableTls = disableTlsOpt[0]
+	}
+
+	_ = Load(sccUrl, auth,
+		WithDebug(debug),
+		WithDisableTLS(disableTls),
+	)
+}
+
+func loadFromEnvToTarget(target ConfigTarget) {
 	for _, env := range os.Environ() {
 		parts := strings.SplitN(env, "=", 2)
 		if len(parts) != 2 {
@@ -112,25 +202,25 @@ func loadFromEnv() {
 		rawKey, value := parts[0], parts[1]
 		viperKey := strings.ToLower(strings.ReplaceAll(rawKey, "_", "."))
 		log.Trace().Msgf("Loading env var %s as %s", rawKey, viperKey)
-		setIfNotExists(viperKey, value)
+		setIfNotExistsOnTarget(target, viperKey, value)
 	}
 }
 
-func setIfNotExists(k string, v any) {
-	if viper.IsSet(k) {
+func setIfNotExistsOnTarget(target ConfigTarget, k string, v any) {
+	if target.IsSet(k) {
 		return
 	}
-	viper.Set(k, v)
+	target.Set(k, v)
 }
 
-func getSCC(url, authHeader string, disableTls bool) ([]byte, error) {
+func getSCCWithContext(ctx context.Context, url, authHeader string, disableTls bool, timeout time.Duration) ([]byte, error) {
 	tlsConfig := &tls.Config{}
 	if disableTls {
 		tlsConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- caller explicitly opted in
 	}
 
 	client := resty.New().
-		SetTimeout(5 * time.Second).
+		SetTimeout(timeout).
 		SetRetryCount(3).
 		SetRetryWaitTime(time.Second).
 		SetTLSClientConfig(tlsConfig)
@@ -141,9 +231,15 @@ func getSCC(url, authHeader string, disableTls bool) ([]byte, error) {
 		}
 	}(client)
 
-	res, err := client.R().
-		SetHeader("Authorization", authHeader).
-		Get(url)
+	req := client.R()
+	if ctx != nil {
+		req.SetContext(ctx)
+	}
+	if authHeader != "" {
+		req.SetHeader("Authorization", authHeader)
+	}
+
+	res, err := req.Get(url)
 	if err != nil {
 		return nil, fmt.Errorf("fail get config from %s with error: %v", url, err)
 	}
