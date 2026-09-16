@@ -17,4 +17,3 @@ _Pekerjaan arsitektural/refactoring jangka panjang untuk maintainability sistem.
 - [ ] **Cipher Text Decryption Enhancement**: Implementasikan dukungan dekripsi untuk nilai properti bertanda `{cipher}` dari Spring Cloud Config ([ADR-004](file:///Users/i/work/KAnggara75/scc2go/DECISIONS.md#adr-004-roadmap-for-cipher-text-encryptiondecryption)).
 - [ ] **Missing Context Propagation**: Integrasikan `context.Context` ke dalam pemanggilan Resty HTTP client di `getSCC` agar mendukung timeout dinamis dan graceful cancellation dari caller.
 - [x] **Adopsi Semantic Versioning Otomatis**: Pipeline CI telah dioptimalkan mengadopsi standar SemVer 2.0.0 via `anothrNick/github-tag-action` berbasis Conventional Commits ([ADR-005](file:///Users/i/work/KAnggara75/scc2go/DECISIONS.md#adr-005-automated-semantic-versioning-semver-with-conventional-commits)).
-
