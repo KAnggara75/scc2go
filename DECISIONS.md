@@ -72,4 +72,3 @@
 - **Consequences**:
   - Positif: Sepenuhnya mematuhi spesifikasi SemVer 2.0.0 dan ekosistem Go modules (`go get`, `go proxy`), otomatisasi rilis tetap berjalan tanpa intervensi manual.
   - Negatif/Trade-off: Memerlukan kepatuhan konsisten dari kontributor dalam menulis prefix Conventional Commits yang tepat pada setiap commit / pull request.
-
