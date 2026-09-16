@@ -41,7 +41,7 @@
 ---
 
 ## 6. Runtime Environment & Constraints
-- **Language / Runtime**: Go 1.25.0+ (diuji pada Go 1.25.7 dan Go 1.26).
+- **Language / Runtime**: Go 1.25.0+ / Go 1.26.0 (diuji pada Go 1.25.7 dan Go 1.26).
 - **OS Support**: Multiplatform (Linux, macOS, Windows).
 - **Network Constraints**: Memerlukan konektivitas HTTP/HTTPS ke Spring Cloud Config Server dengan timeout default 5 detik dan 3 kali percobaan ulang (retry).
 - **Security Scanners**: Wajib mematuhi audit `gosec`, `govulncheck`, dan `staticcheck` yang dieksekusi pada pre-push dan CI.
