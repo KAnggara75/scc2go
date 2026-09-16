@@ -151,3 +151,13 @@ jobs:
           RELEASE_BRANCHES: "main"
           INITIAL_VERSION: "0.1.0"
 
+      - name: Create GitHub Release with commit release notes
+        if: steps.tag_version.outputs.tag != ''
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.tag_version.outputs.tag }}
+          name: Release ${{ steps.tag_version.outputs.tag }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
