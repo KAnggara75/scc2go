@@ -35,32 +35,54 @@ go get -u github.com/KAnggara75/scc2go
 
 ## 🔧 Penggunaan
 
-### 1. Basic Bootstrap
+### 1. Modern Bootstrap with Error Handling (`Load`)
 
-Panggil `scc2go.GetEnv` pada fase bootstrap aplikasi (misalnya di `init()` atau sebelum server dijalankan):
+Direkomendasikan menggunakan `scc2go.Load` yang mengembalikan `error` eksplisit serta mendukung opsi fungsional (`WithViper`, `WithContext`, `WithTimeout`, `WithDebug`, `WithDisableTLS`):
 
 ```go
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
+	"time"
 
 	"github.com/KAnggara75/scc2go"
 	"github.com/spf13/viper"
 )
 
+func main() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	customViper := viper.New()
+
+	err := scc2go.Load(
+		os.Getenv("SCC_URL"),
+		os.Getenv("SCC_AUTH"),
+		scc2go.WithContext(ctx),
+		scc2go.WithViper(customViper), // Gunakan instance custom (atau omit untuk global viper)
+	)
+	if err != nil {
+		log.Fatalf("Gagal memuat konfigurasi SCC: %v", err)
+	}
+
+	appName := customViper.GetString("app.name")
+	port := customViper.GetInt("server.port")
+	fmt.Printf("Starting %s on port %d...\n", appName, port)
+}
+```
+
+### 2. Legacy Helper (`GetEnv`)
+
+Tersedia untuk menjaga kompatibilitas ke belakang tanpa mengembalikan error:
+
+```go
 func init() {
 	// Format: scc2go.GetEnv(sccUrl, authHeader, disableTlsOpt...)
 	scc2go.GetEnv(os.Getenv("SCC_URL"), os.Getenv("SCC_AUTH"))
-}
-
-func main() {
-	// Akses konfigurasi langsung lewat Viper
-	appName := viper.GetString("app.name")
-	port := viper.GetInt("server.port")
-
-	fmt.Printf("Starting %s on port %d...\n", appName, port)
 }
 ```
 
