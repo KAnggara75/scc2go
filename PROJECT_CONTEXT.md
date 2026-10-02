@@ -59,7 +59,9 @@
 ---
 
 ## 8. Known Limitations & Future Roadmap
-- **Error Return**: Saat ini masih berupa silent failure di fungsi public `GetEnv` dan `GetEnvWithDebug`; sedang dijadwalkan untuk mengembalikan eksplisit `error` ([ADR-001](file:///Users/i/work/KAnggara75/scc2go/DECISIONS.md#adr-001-error-return-propagation-on-scc-fetch-failure)).
-- **Custom Viper Instance**: Belum mendukung injeksi langsung ke instance kustom `*viper.Viper` ([ADR-002](file:///Users/i/work/KAnggara75/scc2go/DECISIONS.md#adr-002-support-for-custom-viper-instance)).
 - **Cipher Decryption**: Belum mendukung pemrosesan data `{cipher}` untuk konfigurasi terenkripsi ([ADR-004](file:///Users/i/work/KAnggara75/scc2go/DECISIONS.md#adr-004-roadmap-for-cipher-text-encryptiondecryption)).
-- **Context Propagation**: Belum ada dukungan parameter `context.Context` untuk pembatalan request dinamis.
+- **Resolved Milestones**:
+  - **Explicit Error Return**: Telah diimplementasikan via fungsi `Load(...) error` ([ADR-001](file:///Users/i/work/KAnggara75/scc2go/DECISIONS.md#adr-001-error-return-propagation-on-scc-fetch-failure)).
+  - **Custom Viper Instance**: Telah diimplementasikan via opsi `WithViper(*viper.Viper)` ([ADR-002](file:///Users/i/work/KAnggara75/scc2go/DECISIONS.md#adr-002-support-for-custom-viper-instance)).
+  - **Context Propagation**: Telah diintegrasikan via opsi `WithContext(ctx)`.
+  - **Automated SemVer**: Telah diadopsi via GitHub Tag Action & Release Notes Generator ([ADR-005](file:///Users/i/work/KAnggara75/scc2go/DECISIONS.md#adr-005-automated-semantic-versioning-semver-with-conventional-commits)).

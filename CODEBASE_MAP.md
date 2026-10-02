@@ -3,8 +3,8 @@
 ## `github.com/KAnggara75/scc2go` (Root Module)
 - **Responsibility**: Mengambil konfigurasi aplikasi dari Spring Cloud Config Server via REST API (atau OS environment variables sebagai fallback/local mode) dan menyimpannya langsung ke Viper global registry (`github.com/spf13/viper`).
 - **Entry / Key Files**:
-  - [`scc2go.go`](file:///Users/i/work/KAnggara75/scc2go/scc2go.go) — Implementasi utama: struct data DTO Spring Cloud Config (`springCloudConfig`, `propertySource`), fungsi public `GetEnv` dan `GetEnvWithDebug`, HTTP client via Resty, parser property sources, dan fallback `loadFromEnv`.
-  - [`scc2go_test.go`](file:///Users/i/work/KAnggara75/scc2go/scc2go_test.go) — Comprehensive test suite mencakup unit tests, mock HTTP server (`httptest`), edge case auth header, TLS bypass, dan precedence pengujian key mapping.
+  - [`scc2go.go`](file:///Users/i/work/KAnggara75/scc2go/scc2go.go) — Implementasi utama: struct data DTO Spring Cloud Config (`springCloudConfig`, `propertySource`), interface `ConfigTarget`, fungsi public modern `Load` dengan functional options (`WithViper`, `WithContext`, `WithTimeout`, `WithDebug`, `WithDisableTLS`), serta backward-compatibility helper `GetEnv` dan `GetEnvWithDebug`.
+  - [`scc2go_test.go`](file:///Users/i/work/KAnggara75/scc2go/scc2go_test.go) — Comprehensive test suite mencakup unit tests, mock HTTP server (`httptest`), isolated custom viper (`WithViper`), error propagation (500 status & corrupt JSON), auth header, TLS bypass, dan precedence pengujian key mapping.
   - [`go.mod`](file:///Users/i/work/KAnggara75/scc2go/go.mod) — Definisi modul Go (Go 1.26.0) dan dependencies utama.
   - [`.github/workflows/CI.yaml`](file:///Users/i/work/KAnggara75/scc2go/.github/workflows/CI.yaml) — CI pipeline untuk test (Go 1.26.x), race detection, coverage upload (Codecov), linter suites (gosec, staticcheck, govulncheck, pre-commit), automated Semantic Versioning tagging (`anothrNick/github-tag-action`), dan automated GitHub Release notes generation (`softprops/action-gh-release`).
   - [`.pre-commit-config.yaml`](file:///Users/i/work/KAnggara75/scc2go/.pre-commit-config.yaml) — Standar git hook lokal dan CI: whitespace, merge-conflict check, `goimports`, `go vet`, `go mod tidy`, `zerolog-use-stringer`, serta pre-push checks (`govulncheck`, `staticcheck`, `gosec`).
@@ -17,5 +17,5 @@
 - **External Integrations**:
   - **Spring Cloud Config Server**: Endpoint REST API (`/application/profile`) yang mereturn JSON representasi konfigurasi terpusat.
 - **Key Notes**:
-  - Property precedence: Array `PropertySources` diproses secara terbalik (`for i := len(scc.PropertySources) - 1; i >= 0; i--`), dipadukan dengan `setIfNotExists` (`if viper.IsSet(k) { return }`), sehingga property source dengan prioritas tertinggi dipertahankan dan nilai yang sudah ada sebelumnya tidak ditimpa.
-  - Silent error policy: Kesalahan HTTP atau JSON unmarshal saat ini di-log menggunakan `logger.Error()` tanpa me-return error atau panic.
+  - Property precedence: Array `PropertySources` diproses secara terbalik (`for i := len(scc.PropertySources) - 1; i >= 0; i--`), dipadukan dengan `setIfNotExistsOnTarget` (`if target.IsSet(k) { return }`), sehingga property source dengan prioritas tertinggi dipertahankan dan nilai yang sudah ada sebelumnya tidak ditimpa.
+  - Error propagation: Fungsi `Load(...) error` mengembalikan error deterministik saat HTTP failure atau JSON unmarshal error, sementara fungsi legacy `GetEnv` mempertahankan silent error return demi backward compatibility.

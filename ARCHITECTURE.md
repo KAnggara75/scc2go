@@ -2,14 +2,17 @@
 
 ## 1. Component Architecture & System Boundaries
 
-`scc2go` adalah library/client Go minimalis yang berfungsi sebagai adapter antara **Spring Cloud Config Server** dan **Viper** configuration registry di dalam runtime aplikasi Go.
+`scc2go` adalah library/client Go minimalis yang berfungsi sebagai adapter antara **Spring Cloud Config Server** dan konfigurasi **Viper** (`*viper.Viper` instance atau global registry) di dalam runtime aplikasi Go.
 
 ```mermaid
 graph TD
     subgraph Client Application
-        AppMain["App Entry Point / main.go"] -->|"scc2go.GetEnv(url, auth)"| SCC2GO["scc2go Engine"]
-        SCC2GO -->|"setIfNotExists(k, v)"| ViperReg[("Viper Global Registry")]
-        AppMain -->|"viper.GetString() / etc."| ViperReg
+        AppMain["App Entry Point / main.go"] -->|"scc2go.Load(url, auth, opts...)"| SCC2GO["scc2go Loader Engine"]
+        AppMain -.->|"scc2go.GetEnv(...) [Legacy]"| SCC2GO
+        SCC2GO -->|"setIfNotExistsOnTarget(k, v)"| Target["ConfigTarget Interface"]
+        Target -->|"Default"| ViperReg[("Viper Global Registry")]
+        Target -->|"WithViper(v)"| CustomViper[("Custom *viper.Viper Instance")]
+        AppMain -->|"viper.GetString() / v.GetString()"| ViperReg
     end
 
     subgraph Runtime Environment
@@ -21,12 +24,14 @@ graph TD
     end
 
     SCC2GO -.->|"if sccUrl is empty or 'local'"| EnvVars
-    SCC2GO -->|"HTTP GET (via Resty v3)"| SCCServer
+    SCC2GO -->|"HTTP GET via Resty v3 (Context & Timeout)"| SCCServer
 ```
 
 - **Runtime Mode Switch**:
-  - `sccUrl == ""` atau `sccUrl == "local"`: Mengaktifkan mode lokal/fallback yang membaca variabel lingkungan OS (`os.Environ()`).
+  - `sccUrl == ""` atau `sccUrl == "local"`: Mengaktifkan mode lokal/fallback yang membaca variabel lingkungan OS (`os.Environ()`) dan memetakannya ke target Viper.
   - `sccUrl` berupa HTTP/HTTPS URL: Melakukan request GET ke endpoint Spring Cloud Config.
+- **Target Abstraction**:
+  - Menggunakan interface `ConfigTarget` (`IsSet(key string) bool`, `Set(key string, value any)`) sehingga konfigurasi dapat disuntikkan ke singleton global `viper` (default) atau custom `*viper.Viper` via `WithViper(v)`.
 
 ---
 
@@ -37,71 +42,77 @@ graph TD
 [Application Startup]
        │
        ▼
-scc2go.GetEnv(sccUrl, auth, disableTlsOpt...)
+scc2go.Load(sccUrl, auth, opts...)  /  scc2go.GetEnv(sccUrl, auth, disableTlsOpt...)
        │
        ▼
-scc2go.GetEnvWithDebug(sccUrl, auth, debug, disableTlsOpt...)
+Evaluate Functional Options:
+  - WithContext(ctx)         (default: context.Background())
+  - WithViper(v)             (default: globalViperTarget)
+  - WithTimeout(duration)    (default: 5s)
+  - WithDebug(bool)          (default: false)
+  - WithDisableTLS(bool)     (default: false)
        │
-       ├─── [sccUrl == "" || sccUrl == "local"] ───────► loadFromEnv()
+       ├─── [sccUrl == "" || sccUrl == "local"] ───────► loadFromEnvToTarget(target)
        │                                                      │
        │                                                      ▼
        │                                                os.Environ() -> lower & '_' to '.'
        │                                                      │
        │                                                      ▼
-       │                                                setIfNotExists() -> viper.Set()
+       │                                                setIfNotExistsOnTarget() -> target.Set()
        │
        ▼ [sccUrl valid]
-getSCC(sccUrl, auth, disableTls)
+getSCCWithContext(ctx, sccUrl, auth, disableTls, timeout)
        │
-       ├─── Resty v3 Client initialized (Timeout: 5s, Retries: 3, RetryWait: 1s)
+       ├─── Resty v3 Client initialized (Timeout: cfg.timeout, Retries: 3, RetryWait: 1s)
        ├─── Header: "Authorization: <auth>"
+       ├─── Context attached: req.SetContext(ctx)
        ├─── TLS: InsecureSkipVerify (jika disableTls=true)
        └─── Execute GET request
        │
-       ▼
-JSON Unmarshal response into springCloudConfig struct
+       ▼ [Check HTTP Status]
+       ├─── [Status Failure / Non-2xx] ───────────────► Return error ("fail get config...")
        │
-       ▼
+       ▼ [Status OK]
+JSON Unmarshal response into springCloudConfig struct
+       ├─── [Unmarshal Error] ────────────────────────► Return error ("unmarshal failed...")
+       │
+       ▼ [Unmarshal OK]
 Iterate PropertySources in reverse order:
        for i := len(scc.PropertySources) - 1; i >= 0; i--
        │
        ▼
 Iterate key-value in source:
-       setIfNotExists(key, value) -> if !viper.IsSet(key) { viper.Set(key, value) }
+       setIfNotExistsOnTarget(key, value) -> if !target.IsSet(key) { target.Set(key, value) }
        │
        ▼
-[Completed: Configurations available in viper.*]
+[Completed: Configurations available in Viper, returns nil]
 ```
 
 ---
 
 ## 3. Concurrency & Resource Management
 
-- **Model Konkurensi**: Bersifat sinkron (*synchronous blocking call*). Tidak ada goroutine internal yang di-*spawn* secara asinkron.
-- **Client Lifecycle**: Resty HTTP client dibuat per-pemanggilan `getSCC()` dan langsung ditutup dengan `defer client.Close()`.
+- **Model Konkurensi**: Bersifat sinkron (*synchronous blocking call*). Tidak ada background goroutine yang di-*spawn*.
+- **Client Lifecycle**: Resty HTTP client dibuat per-pemanggilan `getSCCWithContext()` dan langsung dibersihkan dengan `defer client.Close()`.
+- **Cancellation & Dynamic Timeout**:
+  - Mendukung `context.Context` via `WithContext(ctx)` sehingga caller dapat membatalkan fetch HTTP secara anggun (*graceful cancellation*).
+  - Mendukung custom HTTP timeout via `WithTimeout(d)`.
 - **Thread-Safety & Viper Mutex**:
-  - `viper` global instance menggunakan internal mutex untuk operasi `viper.Set` dan `viper.IsSet`.
-  - Pemanggilan `scc2go.GetEnv` dirancang untuk dipanggil pada fase bootstrap atau `func init()` sebelum goroutine worker lain mengakses Viper.
+  - `viper` (baik global singleton maupun `*viper.Viper`) menggunakan internal mutex untuk operasi `Set` dan `IsSet`.
+  - Dukungan `WithViper` memfasilitasi pembuatan instance Viper terisolasi untuk konkurensi multi-tenant atau pengujian paralel tanpa race condition.
 - **Resource Limits & Timeouts**:
-  - HTTP Request Timeout: `5 * time.Second` (`CONFIRMED: scc2go.go:133`).
-  - Retry Policy: 3 kali percobaan ulang dengan jeda 1 detik (`CONFIRMED: scc2go.go:134-135`).
+  - Default HTTP Timeout: `5 * time.Second` (`CONFIRMED: scc2go.go:119`).
+  - Retry Policy: 3 kali percobaan ulang dengan jeda 1 detik (`CONFIRMED: scc2go.go:224-225`).
 
 ---
 
 ## 4. Error Handling & Fault Tolerance
 
 - **Error Strategy**:
-  - **Graceful / Fail-Safe Logging**: Error jaringan HTTP atau kegagalan `json.Unmarshal` dicatat ke logger (`logger.Error()`) dan fungsi kembali (*early return*) tanpa menghentikan proses aplikasi (`panic`) atau me-return `error`.
-  - `CONFIRMED: scc2go.go:78-83, 87-91`:
-    ```go
-    resBody, err := getSCC(sccUrl, auth, disableTls)
-    if err != nil {
-        logger.Error().Err(err).Msg("error when get scc")
-        return
-    }
-    ```
-- **Retry Mechanism**: Resty v3 secara otomatis melakukan retry hingga 3x jika koneksi HTTP gagal (`CONFIRMED: scc2go.go:134`).
-- **Precedence Preservation**: Menggunakan fungsi pembantu `setIfNotExists` untuk memastikan bahwa konfigurasi yang sudah didefinisikan sebelumnya di Viper tidak tertimpa oleh sumber yang memiliki prioritas lebih rendah.
+  - **Deterministic Error Return (`Load`)**: Kesalahan HTTP (status failure) atau corrupt JSON unmarshal mengembalikan `error` eksplisit ke caller (`CONFIRMED: scc2go.go:150-164`).
+  - **Fail-Safe Legacy Compatibility (`GetEnv` & `GetEnvWithDebug`)**: Membungkus pemanggilan `Load` dan mengabaikan nilai return error (`_ = Load(...)`), sehingga backward compatibility bagi caller lama tetap terjaga.
+- **Retry Mechanism**: Resty v3 secara otomatis melakukan retry hingga 3x jika koneksi HTTP gagal (`CONFIRMED: scc2go.go:224`).
+- **Precedence Preservation**: Menggunakan fungsi pembantu `setIfNotExistsOnTarget` untuk memastikan konfigurasi yang bernilai lebih spesifik tidak tertimpa oleh property source dengan prioritas lebih rendah.
 
 ---
 
