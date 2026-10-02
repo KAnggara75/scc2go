@@ -193,8 +193,22 @@ func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
 	)
 }
 
+var (
+	osEnviron     = os.Environ
+	clientFactory = func(timeout time.Duration, tlsConfig *tls.Config) *resty.Client {
+		return resty.New().
+			SetTimeout(timeout).
+			SetRetryCount(3).
+			SetRetryWaitTime(time.Second).
+			SetTLSClientConfig(tlsConfig)
+	}
+	closeClient = func(client *resty.Client) error {
+		return client.Close()
+	}
+)
+
 func loadFromEnvToTarget(target ConfigTarget) {
-	for _, env := range os.Environ() {
+	for _, env := range osEnviron() {
 		parts := strings.SplitN(env, "=", 2)
 		if len(parts) != 2 {
 			continue
@@ -219,13 +233,9 @@ func getSCCWithContext(ctx context.Context, url, authHeader string, disableTls b
 		tlsConfig = &tls.Config{InsecureSkipVerify: true} // #nosec G402 -- caller explicitly opted in
 	}
 
-	client := resty.New().
-		SetTimeout(timeout).
-		SetRetryCount(3).
-		SetRetryWaitTime(time.Second).
-		SetTLSClientConfig(tlsConfig)
+	client := clientFactory(timeout, tlsConfig)
 	defer func(client *resty.Client) {
-		err := client.Close()
+		err := closeClient(client)
 		if err != nil {
 			fmt.Println(err)
 		}

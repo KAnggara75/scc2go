@@ -11,13 +11,17 @@
 package scc2go_test
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/spf13/viper"
+	"resty.dev/v3"
 
 	"github.com/KAnggara75/scc2go"
 )
@@ -573,4 +577,114 @@ func TestLoadErrorPropagation(t *testing.T) {
 			t.Errorf("Expected json unmarshal error from Load, got nil")
 		}
 	})
+}
+
+func TestLoadWithContextAndTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := map[string]any{
+			"name":     "test-app",
+			"profiles": []string{"default"},
+			"propertySources": []map[string]any{
+				{
+					"name": "test-source",
+					"source": map[string]any{
+						"app.timeout.key": "timeout-val",
+					},
+				},
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	t.Run("successful load with context and custom timeout", func(t *testing.T) {
+		viper.Reset()
+		ctx := context.Background()
+		err := scc2go.Load(
+			server.URL,
+			"Bearer token",
+			scc2go.WithContext(ctx),
+			scc2go.WithTimeout(3*time.Second),
+		)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+		if viper.GetString("app.timeout.key") != "timeout-val" {
+			t.Errorf("Expected 'timeout-val', got '%s'", viper.GetString("app.timeout.key"))
+		}
+	})
+
+	t.Run("nil context and non-positive timeout fallbacks", func(t *testing.T) {
+		viper.Reset()
+		var nilCtx context.Context // lint:ignore SA1012 testing nil context defensive fallback
+		err := scc2go.Load(
+			server.URL,
+			"Bearer token",
+			scc2go.WithContext(nilCtx), //nolint:staticcheck // SA1012
+			scc2go.WithTimeout(-1*time.Second),
+			nil, // Cover nil option branch in Load
+		)
+		if err != nil {
+			t.Fatalf("Expected no error, got: %v", err)
+		}
+		if viper.GetString("app.timeout.key") != "timeout-val" {
+			t.Errorf("Expected 'timeout-val', got '%s'", viper.GetString("app.timeout.key"))
+		}
+	})
+
+	t.Run("cancelled context stops request", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel() // Cancel immediately
+
+		err := scc2go.Load(server.URL, "Bearer token", scc2go.WithContext(ctx))
+		if err == nil {
+			t.Errorf("Expected error with cancelled context, got nil")
+		}
+	})
+}
+
+func TestLoadFromEnvMalformedEntry(t *testing.T) {
+	viper.Reset()
+
+	restore := scc2go.SetOsEnvironForTest(func() []string {
+		return []string{
+			"INVALID_ENV_WITHOUT_EQUALS",
+			"VALID_ENV_VAR=valid_value",
+		}
+	})
+	defer restore()
+
+	err := scc2go.Load("", "")
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if viper.GetString("valid.env.var") != "valid_value" {
+		t.Errorf("Expected valid_value, got %s", viper.GetString("valid.env.var"))
+	}
+}
+
+func TestGetSCCClientCloseError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := map[string]any{
+			"name":            "test-app",
+			"profiles":        []string{"default"},
+			"propertySources": []map[string]any{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	restore := scc2go.SetCloseClientForTest(func(client *resty.Client) error {
+		_ = client.Close()
+		return errors.New("simulated close error")
+	})
+	defer restore()
+
+	err := scc2go.Load(server.URL, "")
+	if err != nil {
+		t.Fatalf("Expected Load to succeed even if close logs an error, got: %v", err)
+	}
 }

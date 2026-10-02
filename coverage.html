@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 
-				<option value="file0">github.com/KAnggara75/scc2go/scc2go.go (96.7%)</option>
+				<option value="file0">github.com/KAnggara75/scc2go/scc2go.go (100.0%)</option>
 
 				</select>
 			</div>
@@ -84,6 +84,7 @@
 package scc2go
 
 import (
+        "context"
         "crypto/tls"
         "encoding/json"
         "fmt"
@@ -111,15 +112,92 @@ type propertySource struct {
         Source map[string]any `json:"source"`
 }
 
-func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
-        <span class="cov8" title="1">GetEnvWithDebug(sccUrl, auth, false, disableTlsOpt...)
+// ConfigTarget is an abstraction for setting key-values into Viper instances.
+type ConfigTarget interface {
+        IsSet(key string) bool
+        Set(key string, value any)
+}
+
+type globalViperTarget struct{}
+
+func (globalViperTarget) IsSet(key string) bool {
+        <span class="cov8" title="1">return viper.IsSet(key)
 </span>}
 
-func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
-        <span class="cov8" title="1">zerolog.TimeFieldFormat = zerolog.TimeFormatUnix
-</span>
+func (globalViperTarget) Set(key string, value any) {
+        <span class="cov8" title="1">viper.Set(key, value)
+</span>}
+
+// Option configures behavior of SCC loading.
+type Option func(*loaderConfig)
+
+type loaderConfig struct {
+        ctx        context.Context
+        target     ConfigTarget
+        debug      bool
+        disableTls bool
+        timeout    time.Duration
+}
+
+// WithContext supplies a context for cancellation and timeouts.
+func WithContext(ctx context.Context) Option {
+        <span class="cov8" title="1">return func(c *loaderConfig) </span>{
+                <span class="cov8" title="1">if ctx != nil </span>{
+                        <span class="cov8" title="1">c.ctx = ctx
+</span>                }
+        }
+}
+
+// WithViper specifies a custom *viper.Viper instance to populate instead of the global singleton.
+func WithViper(v *viper.Viper) Option {
+        <span class="cov8" title="1">return func(c *loaderConfig) </span>{
+                <span class="cov8" title="1">if v != nil </span>{
+                        <span class="cov8" title="1">c.target = v
+</span>                }
+        }
+}
+
+// WithDebug enables or disables trace-level logging.
+func WithDebug(debug bool) Option {
+        <span class="cov8" title="1">return func(c *loaderConfig) </span>{
+                <span class="cov8" title="1">c.debug = debug
+</span>        }
+}
+
+// WithDisableTLS skips TLS certificate verification.
+func WithDisableTLS(disable bool) Option {
+        <span class="cov8" title="1">return func(c *loaderConfig) </span>{
+                <span class="cov8" title="1">c.disableTls = disable
+</span>        }
+}
+
+// WithTimeout sets a custom HTTP request timeout.
+func WithTimeout(timeout time.Duration) Option {
+        <span class="cov8" title="1">return func(c *loaderConfig) </span>{
+                <span class="cov8" title="1">if timeout &gt; 0 </span>{
+                        <span class="cov8" title="1">c.timeout = timeout
+</span>                }
+        }
+}
+
+// Load fetches configurations and stores them into the designated target, returning an error if retrieval or unmarshaling fails.
+func Load(sccUrl, auth string, opts ...Option) error {
+        <span class="cov8" title="1">cfg := &amp;loaderConfig{
+                ctx:        context.Background(),
+                target:     globalViperTarget{},
+                debug:      false,
+                disableTls: false,
+                timeout:    5 * time.Second,
+</span>        }
+
+        <span class="cov8" title="1">for _, opt := range opts </span>{
+                <span class="cov8" title="1">if opt != nil </span>{
+                        <span class="cov8" title="1">opt(cfg)
+</span>                }
+        }
+
         <span class="cov8" title="1">level := zerolog.InfoLevel
-        if debug </span>{
+        if cfg.debug </span>{
                 <span class="cov8" title="1">level = zerolog.TraceLevel
 </span>        }
 
@@ -130,27 +208,22 @@ func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
                 Str("component", "scc_loader").
                 Logger()
 </span>
-        <span class="cov8" title="1">disableTls := false
-        if len(disableTlsOpt) &gt; 0 </span>{
-                <span class="cov8" title="1">disableTls = disableTlsOpt[0]
-</span>        }
-
         <span class="cov8" title="1">if sccUrl == "" || sccUrl == "local" </span>{
                 <span class="cov8" title="1">logger.Info().Msg("SCC URL is local or empty, loading from environment variables")
-                loadFromEnv()
-                return
+                loadFromEnvToTarget(cfg.target)
+                return nil
 </span>        }
 
         <span class="cov8" title="1">logger.Info().
                 Str("scc_url", sccUrl).
                 Msg("using SCC URL")
 </span>
-        <span class="cov8" title="1">resBody, err := getSCC(sccUrl, auth, disableTls)
+        <span class="cov8" title="1">resBody, err := getSCCWithContext(cfg.ctx, sccUrl, auth, cfg.disableTls, cfg.timeout)
         if err != nil </span>{
                 <span class="cov8" title="1">logger.Error().
                         Err(err).
                         Msg("error when get scc")
-                return
+                return err
 </span>        }
 
         <span class="cov8" title="1">var scc springCloudConfig
@@ -158,7 +231,7 @@ func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
                 <span class="cov8" title="1">logger.Error().
                         Err(err).
                         Msg("spring cloud config unmarshal failed")
-                return
+                return fmt.Errorf("spring cloud config unmarshal failed: %w", err)
 </span>        }
 
         <span class="cov8" title="1">for i := len(scc.PropertySources) - 1; i &gt;= 0; i-- </span>{
@@ -166,60 +239,93 @@ func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
                         <span class="cov8" title="1">logger.Trace().
                                 Str("key", key).
                                 Msg("retrieve property")
-                        setIfNotExists(key, value)
+                        setIfNotExistsOnTarget(cfg.target, key, value)
 </span>                }
         }
+
+        <span class="cov8" title="1">return nil</span>
 }
 
-// loadFromEnv reads all OS environment variables and stores them in viper.
-// Each env var key is transformed: underscores (_) become dots (.)
-// and the key is lowercased so that EXAMPLE_VAR becomes example.var.
-func loadFromEnv() {
-        <span class="cov8" title="1">for _, env := range os.Environ() </span>{
+// GetEnv preserves backward compatibility by populating the global viper singleton without returning an error.
+func GetEnv(sccUrl, auth string, disableTlsOpt ...bool) {
+        <span class="cov8" title="1">GetEnvWithDebug(sccUrl, auth, false, disableTlsOpt...)
+</span>}
+
+// GetEnvWithDebug preserves backward compatibility with debug logging flag.
+func GetEnvWithDebug(sccUrl, auth string, debug bool, disableTlsOpt ...bool) {
+        <span class="cov8" title="1">disableTls := false
+        if len(disableTlsOpt) &gt; 0 </span>{
+                <span class="cov8" title="1">disableTls = disableTlsOpt[0]
+</span>        }
+
+        <span class="cov8" title="1">_ = Load(sccUrl, auth,
+                WithDebug(debug),
+                WithDisableTLS(disableTls),
+        )</span>
+}
+
+var (
+        osEnviron     = os.Environ
+        clientFactory = func(timeout time.Duration, tlsConfig *tls.Config) *resty.Client {
+                <span class="cov8" title="1">return resty.New().
+                        SetTimeout(timeout).
+                        SetRetryCount(3).
+                        SetRetryWaitTime(time.Second).
+                        SetTLSClientConfig(tlsConfig)
+</span>        }
+        closeClient = func(client *resty.Client) error {
+                <span class="cov8" title="1">return client.Close()
+</span>        }
+)
+
+func loadFromEnvToTarget(target ConfigTarget) {
+        <span class="cov8" title="1">for _, env := range osEnviron() </span>{
                 <span class="cov8" title="1">parts := strings.SplitN(env, "=", 2)
                 if len(parts) != 2 </span>{
-                        <span class="cov0" title="0">continue</span>
+                        <span class="cov8" title="1">continue</span>
                 }
                 <span class="cov8" title="1">rawKey, value := parts[0], parts[1]
                 viperKey := strings.ToLower(strings.ReplaceAll(rawKey, "_", "."))
                 log.Trace().Msgf("Loading env var %s as %s", rawKey, viperKey)
-                setIfNotExists(viperKey, value)</span>
+                setIfNotExistsOnTarget(target, viperKey, value)</span>
         }
 }
 
-func setIfNotExists(k string, v any) {
-        <span class="cov8" title="1">if viper.IsSet(k) </span>{
+func setIfNotExistsOnTarget(target ConfigTarget, k string, v any) {
+        <span class="cov8" title="1">if target.IsSet(k) </span>{
                 <span class="cov8" title="1">return
 </span>        }
-        <span class="cov8" title="1">viper.Set(k, v)</span>
+        <span class="cov8" title="1">target.Set(k, v)</span>
 }
 
-func getSCC(url, authHeader string, disableTls bool) ([]byte, error) {
+func getSCCWithContext(ctx context.Context, url, authHeader string, disableTls bool, timeout time.Duration) ([]byte, error) {
         <span class="cov8" title="1">tlsConfig := &amp;tls.Config{}
         if disableTls </span>{
                 <span class="cov8" title="1">tlsConfig = &amp;tls.Config{InsecureSkipVerify: true} // #nosec G402 -- caller explicitly opted in
 </span>        }
 
-        <span class="cov8" title="1">client := resty.New().
-                SetTimeout(5 * time.Second).
-                SetRetryCount(3).
-                SetRetryWaitTime(time.Second).
-                SetTLSClientConfig(tlsConfig)
+        <span class="cov8" title="1">client := clientFactory(timeout, tlsConfig)
         defer func(client *resty.Client) </span>{
-                <span class="cov8" title="1">err := client.Close()
+                <span class="cov8" title="1">err := closeClient(client)
                 if err != nil </span>{
-                        <span class="cov0" title="0">fmt.Println(err)
+                        <span class="cov8" title="1">fmt.Println(err)
 </span>                }
         }(client)
 
-        <span class="cov8" title="1">res, err := client.R().
-                SetHeader("Authorization", authHeader).
-                Get(url)
+        <span class="cov8" title="1">req := client.R()
+        if ctx != nil </span>{
+                <span class="cov8" title="1">req.SetContext(ctx)
+</span>        }
+        <span class="cov8" title="1">if authHeader != "" </span>{
+                <span class="cov8" title="1">req.SetHeader("Authorization", authHeader)
+</span>        }
+
+        <span class="cov8" title="1">res, err := req.Get(url)
         if err != nil </span>{
                 <span class="cov8" title="1">return nil, fmt.Errorf("fail get config from %s with error: %v", url, err)
 </span>        }
 
-        <span class="cov8" title="1">if res.IsError() </span>{
+        <span class="cov8" title="1">if res.IsStatusFailure() </span>{
                 <span class="cov8" title="1">return nil, fmt.Errorf("fail get config from %s with error: %s", url, res.Status())
 </span>        }
 
